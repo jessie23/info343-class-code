@@ -5,22 +5,16 @@
 angular.module('ContactsApp', ['ui.router', 'angular-uuid', 'LocalStorageModule'])
     .constant('storageKey', 'contacts-list')
     .factory('contacts', function(uuid, localStorageService, storageKey) { //needs to have same parameter name as constant
-        return [{
-            id: 'default-delete-me',
-            fname: 'Fred',
-            lname: 'Flinstone',
-            phone: '206-555-1212',
-            dob: '1/1/1900'
-        }];
+           return localStorageService.get(storageKey) || [];
     })
-    .config(function($stateProvider, $urlRouterProvider){
+    .config(function($stateProvider, $urlRouterProvider) {
         $stateProvider
             .state('list', {
                 url: '/contacts',
                 templateUrl: 'views/contacts-list.html',
                 controller: 'ContactsController'
             })
-             .state('detail', {
+            .state('detail', {
                 url: '/contacts/:id',
                 templateUrl: 'views/contact-detail.html',
                 controller: 'ContactDetailController'
@@ -33,6 +27,18 @@ angular.module('ContactsApp', ['ui.router', 'angular-uuid', 'LocalStorageModule'
 
         $urlRouterProvider.otherwise('/contacts');
     })
+    .directive('inThePast', function() {
+        return {
+            require: 'ngModel',
+                link: function(scope, sleme, attrs, controller) {
+                controller.$validators.inThePast = function(modelValue) {
+                    var today = new Date();
+                    return (new Date(modelValue) <= today);
+                }
+            }
+
+        };
+    })
     .controller('ContactsController', function($scope, contacts) {
         $scope.contacts = contacts;
     })
@@ -41,15 +47,25 @@ angular.module('ContactsApp', ['ui.router', 'angular-uuid', 'LocalStorageModule'
             return contact.id === $stateParams.id; //matches id in url under .state
         });
     })
-    .controller('EditContactController', function($scope, $stateParams, $state, contacts) {
+    .controller('EditContactController', function($scope, $stateParams, $state,
+                                                  uuid, localStorageService, storageKey, contacts) {
         var existingContact = contacts.find(function(contact) { //returns one contact out of the array
             return contact.id === $stateParams.id; //matches id in url under .state
         });
 
         $scope.contact = angular.copy(existingContact);
 
-        $scope.save = function() {
-            angular.copy($scope.contact, existingContact);
+        $scope.saveContact = function() {
+            if ($scope.contact.id) {
+                angular.copy($scope.contact, existingContact);
+            }
+            else {
+                $scope.contact.id = uuid.v4();
+                contacts.push($scope.contact);
+            }
+
+            localStorageService.set(storageKey, contacts);
+
             $state.go('list');
         }
     });
